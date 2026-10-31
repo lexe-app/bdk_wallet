@@ -402,6 +402,11 @@ fn changeset_info(f: &mut fmt::Formatter<'_>, changeset: &ChangeSet) -> fmt::Res
         .and_then(|d| calc_checksum(&d.to_string()).ok())
         .unwrap_or_else(|| "None".to_string());
 
+    let single_use_descriptor_checksum = changeset
+        .single_use_descriptor
+        .as_ref()
+        .and_then(|d| calc_checksum(&d.to_string()).ok());
+
     let tx_count = changeset.tx_graph.txs.len();
 
     let anchor_count = changeset.tx_graph.anchors.len();
@@ -419,6 +424,9 @@ fn changeset_info(f: &mut fmt::Formatter<'_>, changeset: &ChangeSet) -> fmt::Res
         "  Change Descriptor Checksum: {}",
         change_descriptor_checksum
     )?;
+    if let Some(checksum) = single_use_descriptor_checksum {
+        writeln!(f, "  Single-Use Descriptor Checksum: {}", checksum)?;
+    }
     writeln!(f, "  Transaction Count: {}", tx_count)?;
     writeln!(f, "  Anchor Count: {}", anchor_count)?;
     writeln!(f, "  Block Count: {}", block_count)?;

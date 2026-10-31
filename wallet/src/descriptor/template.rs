@@ -209,7 +209,7 @@ impl<K: IntoDescriptorKey<Tap>> DescriptorTemplate for P2TR<K> {
     }
 }
 
-/// BIP44 template. Expands to `pkh(key/44'/{0,1}'/0'/{0,1}/*)`
+/// BIP44 template. Expands to `pkh(key/44'/{0,1}'/0'/{0,1,2}/*)`
 ///
 /// Since there are hardened derivation steps, this template requires a private derivable key
 /// (generally a `xprv`/`tprv`).
@@ -242,7 +242,7 @@ impl<K: DerivableKey<Legacy>> DescriptorTemplate for Bip44<K> {
     }
 }
 
-/// BIP44 public template. Expands to `pkh(key/{0,1}/*)`
+/// BIP44 public template. Expands to `pkh(key/{0,1,2}/*)`
 ///
 /// This assumes that the key used has already been derived with `m/44'/0'/0'` for Mainnet or
 /// `m/44'/1'/0'` for Testnet.
@@ -285,7 +285,7 @@ impl<K: DerivableKey<Legacy>> DescriptorTemplate for Bip44Public<K> {
     }
 }
 
-/// BIP49 template. Expands to `sh(wpkh(key/49'/{0,1}'/0'/{0,1}/*))`
+/// BIP49 template. Expands to `sh(wpkh(key/49'/{0,1}'/0'/{0,1,2}/*))`
 ///
 /// Since there are hardened derivation steps, this template requires a private derivable key
 /// (generally a `xprv`/`tprv`).
@@ -321,7 +321,7 @@ impl<K: DerivableKey<Segwitv0>> DescriptorTemplate for Bip49<K> {
     }
 }
 
-/// BIP49 public template. Expands to `sh(wpkh(key/{0,1}/*))`
+/// BIP49 public template. Expands to `sh(wpkh(key/{0,1,2}/*))`
 ///
 /// This assumes that the key used has already been derived with `m/49'/0'/0'` for Mainnet or
 /// `m/49'/1'/0'` for Testnet.
@@ -364,7 +364,7 @@ impl<K: DerivableKey<Segwitv0>> DescriptorTemplate for Bip49Public<K> {
     }
 }
 
-/// BIP84 template. Expands to `wpkh(key/84'/{0,1}'/0'/{0,1}/*)`
+/// BIP84 template. Expands to `wpkh(key/84'/{0,1}'/0'/{0,1,2}/*)`
 ///
 /// Since there are hardened derivation steps, this template requires a private derivable key
 /// (generally a `xprv`/`tprv`).
@@ -400,7 +400,7 @@ impl<K: DerivableKey<Segwitv0>> DescriptorTemplate for Bip84<K> {
     }
 }
 
-/// BIP84 public template. Expands to `wpkh(key/{0,1}/*)`
+/// BIP84 public template. Expands to `wpkh(key/{0,1,2}/*)`
 ///
 /// This assumes that the key used has already been derived with `m/84'/0'/0'` for Mainnet or
 /// `m/84'/1'/0'` for Testnet.
@@ -443,7 +443,7 @@ impl<K: DerivableKey<Segwitv0>> DescriptorTemplate for Bip84Public<K> {
     }
 }
 
-/// BIP86 template. Expands to `tr(key/86'/{0,1}'/0'/{0,1}/*)`
+/// BIP86 template. Expands to `tr(key/86'/{0,1}'/0'/{0,1,2}/*)`
 ///
 /// Since there are hardened derivation steps, this template requires a private derivable key
 /// (generally a `xprv`/`tprv`).
@@ -479,7 +479,7 @@ impl<K: DerivableKey<Tap>> DescriptorTemplate for Bip86<K> {
     }
 }
 
-/// BIP86 public template. Expands to `tr(key/{0,1}/*)`
+/// BIP86 public template. Expands to `tr(key/{0,1,2}/*)`
 ///
 /// This assumes that the key used has already been derived with `m/86'/0'/0'` for Mainnet or
 /// `m/86'/1'/0'` for Testnet.
@@ -553,6 +553,9 @@ macro_rules! expand_make_bipxx {
                     KeychainKind::Internal => {
                         derivation_path.push(bip32::ChildNumber::from_normal_idx(1)?)
                     }
+                    KeychainKind::SingleUse => {
+                        derivation_path.push(bip32::ChildNumber::from_normal_idx(2)?)
+                    }
                 };
 
                 let derivation_path: bip32::DerivationPath = derivation_path.into();
@@ -569,6 +572,7 @@ macro_rules! expand_make_bipxx {
                 let derivation_path: bip32::DerivationPath = match keychain {
                     KeychainKind::External => vec![bip32::ChildNumber::from_normal_idx(0)?].into(),
                     KeychainKind::Internal => vec![bip32::ChildNumber::from_normal_idx(1)?].into(),
+                    KeychainKind::SingleUse => vec![bip32::ChildNumber::from_normal_idx(2)?].into(),
                 };
 
                 let source_path = bip32::DerivationPath::from(vec![
@@ -901,7 +905,7 @@ mod test {
         );
     }
 
-    // BIP84 `wpkh(key/84'/0'/0'/{0,1}/*)`
+    // BIP84 `wpkh(key/84'/0'/0'/{0,1,2}/*)`
     #[test]
     fn test_bip84_template() {
         let prvkey = bitcoin::bip32::Xpriv::from_str("tprv8ZgxMBicQKsPcx5nBGsR63Pe8KnRUqmbJNENAfGftF3yuXoMMoVJJcYeUw5eVkm9WBPjWYt6HMWYJNesB5HaNVBaFc1M6dRjWSYnmewUMYy").unwrap();
@@ -929,9 +933,21 @@ mod test {
                 "bcrt1qpks7n0gq74hsgsz3phn5vuazjjq0f5eqhsgyce",
             ],
         );
+        check(
+            Bip84(prvkey, KeychainKind::SingleUse).build(Network::Bitcoin),
+            true,
+            false,
+            false,
+            Network::Regtest,
+            &[
+                "bcrt1q85mv4pf9hpd05dv8j5uxwx7fa2cpnszy4yw3tv",
+                "bcrt1qyy58cw4vkk0xc0k4rwmcjeepursxqngww2r52y",
+                "bcrt1q75h2ku0535urwr4gsdju54q907494rup4a0rpl",
+            ],
+        );
     }
 
-    // BIP84 public `wpkh(key/{0,1}/*)`
+    // BIP84 public `wpkh(key/{0,1,2}/*)`
     #[test]
     fn test_bip84_public_template() {
         let pubkey = bitcoin::bip32::Xpub::from_str("tpubDC2Qwo2TFsaNC4ju8nrUJ9mqVT3eSgdmy1yPqhgkjwmke3PRXutNGRYAUo6RCHTcVQaDR3ohNU9we59brGHuEKPvH1ags2nevW5opEE9Z5Q").unwrap();
@@ -958,6 +974,18 @@ mod test {
                 "bcrt1qm6wqukenh7guu792lj2njgw9n78cmwsy8xy3z2",
                 "bcrt1q694twxtjn4nnrvnyvra769j0a23rllj5c6cgwp",
                 "bcrt1qhlac3c5ranv5w5emlnqs7wxhkxt8maelylcarp",
+            ],
+        );
+        check(
+            Bip84Public(pubkey, fingerprint, KeychainKind::SingleUse).build(Network::Bitcoin),
+            true,
+            false,
+            false,
+            Network::Regtest,
+            &[
+                "bcrt1q2fulhvvwn8qmnl4vqqqe0fktvzj2zamqd49h97",
+                "bcrt1qts50cs56r3k9qvyjaj5p59dkll3dpqv8a83krx",
+                "bcrt1qcemu38yk2sgh36nrf7lptqjy90sl6wzqf2lwck",
             ],
         );
     }

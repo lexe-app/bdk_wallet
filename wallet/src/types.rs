@@ -26,6 +26,10 @@ pub enum KeychainKind {
     External = 0,
     /// Internal keychain, used for deriving change addresses.
     Internal = 1,
+    /// Optional keychain for addresses that are each revealed and handed out once.
+    ///
+    /// This keychain is receive-only: change is never sent to it.
+    SingleUse = 2,
 }
 
 impl KeychainKind {
@@ -34,6 +38,7 @@ impl KeychainKind {
         match self {
             KeychainKind::External => b'e',
             KeychainKind::Internal => b'i',
+            KeychainKind::SingleUse => b's',
         }
     }
 }
@@ -43,6 +48,7 @@ impl fmt::Display for KeychainKind {
         match self {
             KeychainKind::External => write!(f, "External"),
             KeychainKind::Internal => write!(f, "Internal"),
+            KeychainKind::SingleUse => write!(f, "SingleUse"),
         }
     }
 }
@@ -52,6 +58,7 @@ impl AsRef<[u8]> for KeychainKind {
         match self {
             KeychainKind::External => b"e",
             KeychainKind::Internal => b"i",
+            KeychainKind::SingleUse => b"s",
         }
     }
 }

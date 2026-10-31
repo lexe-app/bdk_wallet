@@ -16,7 +16,7 @@ use super::{ChangeSet, LoadError, PersistedWallet};
 ///
 /// The better option would be to do `Box<dyn IntoWalletDescriptor>`, but we cannot due to Rust's
 /// [object safety rules](https://doc.rust-lang.org/reference/items/traits.html#object-safety).
-type DescriptorToExtract = Box<
+pub(crate) type DescriptorToExtract = Box<
     dyn FnOnce(&SecpCtx, Network) -> Result<(ExtendedDescriptor, KeyMap), DescriptorError>
         + Send
         + 'static,
@@ -36,6 +36,8 @@ pub struct CreateParams {
     pub(crate) descriptor_keymap: KeyMap,
     pub(crate) change_descriptor: Option<DescriptorToExtract>,
     pub(crate) change_descriptor_keymap: KeyMap,
+    pub(crate) single_use_descriptor: Option<DescriptorToExtract>,
+    pub(crate) single_use_descriptor_keymap: KeyMap,
     pub(crate) network: Network,
     pub(crate) genesis_hash: Option<BlockHash>,
     pub(crate) lookahead: u32,
@@ -47,6 +49,7 @@ impl CreateParams {
     ///
     /// Default values:
     /// * `change_descriptor` = `None`
+    /// * `single_use_descriptor` = `None`
     /// * `network` = [`Network::Bitcoin`]
     /// * `genesis_hash` = `None`
     /// * `lookahead` = [`DEFAULT_LOOKAHEAD`]
@@ -59,6 +62,8 @@ impl CreateParams {
             descriptor_keymap: KeyMap::default(),
             change_descriptor: None,
             change_descriptor_keymap: KeyMap::default(),
+            single_use_descriptor: None,
+            single_use_descriptor_keymap: KeyMap::default(),
             network: Network::Bitcoin,
             genesis_hash: None,
             lookahead: DEFAULT_LOOKAHEAD,
@@ -69,6 +74,7 @@ impl CreateParams {
     /// Construct parameters with provided `descriptor` and `change_descriptor`.
     ///
     /// Default values:
+    /// * `single_use_descriptor` = `None`
     /// * `network` = [`Network::Bitcoin`]
     /// * `genesis_hash` = `None`
     /// * `lookahead` = [`DEFAULT_LOOKAHEAD`]
@@ -81,6 +87,8 @@ impl CreateParams {
             descriptor_keymap: KeyMap::default(),
             change_descriptor: Some(make_descriptor_to_extract(change_descriptor)),
             change_descriptor_keymap: KeyMap::default(),
+            single_use_descriptor: None,
+            single_use_descriptor_keymap: KeyMap::default(),
             network: Network::Bitcoin,
             genesis_hash: None,
             lookahead: DEFAULT_LOOKAHEAD,
@@ -93,8 +101,18 @@ impl CreateParams {
         match keychain {
             KeychainKind::External => &mut self.descriptor_keymap,
             KeychainKind::Internal => &mut self.change_descriptor_keymap,
+            KeychainKind::SingleUse => &mut self.single_use_descriptor_keymap,
         }
         .extend(keymap);
+        self
+    }
+
+    /// Set the descriptor for the [`SingleUse`](KeychainKind::SingleUse) keychain.
+    pub fn single_use_descriptor<D: IntoWalletDescriptor + Send + 'static>(
+        mut self,
+        descriptor: D,
+    ) -> Self {
+        self.single_use_descriptor = Some(make_descriptor_to_extract(descriptor));
         self
     }
 
@@ -163,11 +181,13 @@ impl CreateParams {
 pub struct LoadParams {
     pub(crate) descriptor_keymap: KeyMap,
     pub(crate) change_descriptor_keymap: KeyMap,
+    pub(crate) single_use_descriptor_keymap: KeyMap,
     pub(crate) lookahead: u32,
     pub(crate) check_network: Option<Network>,
     pub(crate) check_genesis_hash: Option<BlockHash>,
     pub(crate) check_descriptor: Option<Option<DescriptorToExtract>>,
     pub(crate) check_change_descriptor: Option<Option<DescriptorToExtract>>,
+    pub(crate) check_single_use_descriptor: Option<Option<DescriptorToExtract>>,
     pub(crate) extract_keys: bool,
     pub(crate) use_spk_cache: bool,
 }
@@ -180,11 +200,13 @@ impl LoadParams {
         Self {
             descriptor_keymap: KeyMap::default(),
             change_descriptor_keymap: KeyMap::default(),
+            single_use_descriptor_keymap: KeyMap::default(),
             lookahead: DEFAULT_LOOKAHEAD,
             check_network: None,
             check_genesis_hash: None,
             check_descriptor: None,
             check_change_descriptor: None,
+            check_single_use_descriptor: None,
             extract_keys: false,
             use_spk_cache: false,
         }
@@ -195,6 +217,7 @@ impl LoadParams {
         match keychain {
             KeychainKind::External => &mut self.descriptor_keymap,
             KeychainKind::Internal => &mut self.change_descriptor_keymap,
+            KeychainKind::SingleUse => &mut self.single_use_descriptor_keymap,
         }
         .extend(keymap);
         self
@@ -214,6 +237,7 @@ impl LoadParams {
         match keychain {
             KeychainKind::External => self.check_descriptor = Some(expected),
             KeychainKind::Internal => self.check_change_descriptor = Some(expected),
+            KeychainKind::SingleUse => self.check_single_use_descriptor = Some(expected),
         }
         self
     }

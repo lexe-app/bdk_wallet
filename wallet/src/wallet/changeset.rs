@@ -54,7 +54,7 @@ type IndexedTxGraphChangeSet =
 /// The [`change_descriptor`] is special in that its presence is optional, however the value of the
 /// change descriptor should be defined at wallet creation time and respected for the life of the
 /// wallet, meaning that if a change descriptor is originally defined, it must also be present in
-/// the aggregate change set.
+/// the aggregate change set. The same applies to the [`single_use_descriptor`].
 ///
 /// ## Staging
 ///
@@ -94,6 +94,7 @@ type IndexedTxGraphChangeSet =
 /// [`local_chain`]: Self::local_chain
 /// [merged]: bdk_chain::Merge
 /// [`network`]: Self::network
+/// [`single_use_descriptor`]: Self::single_use_descriptor
 /// [`PersistedWallet`]: crate::PersistedWallet
 /// [SQLite]: bdk_chain::rusqlite_impl
 /// [`Update`]: crate::Update
@@ -106,6 +107,11 @@ pub struct ChangeSet {
     pub descriptor: Option<Descriptor<DescriptorPublicKey>>,
     /// Descriptor for change addresses.
     pub change_descriptor: Option<Descriptor<DescriptorPublicKey>>,
+    /// Descriptor for single-use receive addresses.
+    ///
+    /// Not persisted by the `rusqlite` backend: Lexe only persists the change set via serde, and
+    /// the sqlite column was dropped to keep this fork's diff from upstream small.
+    pub single_use_descriptor: Option<Descriptor<DescriptorPublicKey>>,
     /// Stores the network type of the transaction data.
     pub network: Option<bitcoin::Network>,
     /// Changes to the [`LocalChain`](local_chain::LocalChain).
@@ -134,6 +140,14 @@ impl Merge for ChangeSet {
             );
             self.change_descriptor = other.change_descriptor;
         }
+        if other.single_use_descriptor.is_some() {
+            debug_assert!(
+                self.single_use_descriptor.is_none()
+                    || self.single_use_descriptor == other.single_use_descriptor,
+                "single-use descriptor must never change"
+            );
+            self.single_use_descriptor = other.single_use_descriptor;
+        }
         if other.network.is_some() {
             debug_assert!(
                 self.network.is_none() || self.network == other.network,
@@ -150,6 +164,7 @@ impl Merge for ChangeSet {
     fn is_empty(&self) -> bool {
         self.descriptor.is_none()
             && self.change_descriptor.is_none()
+            && self.single_use_descriptor.is_none()
             && self.network.is_none()
             && self.local_chain.is_empty()
             && self.tx_graph.is_empty()

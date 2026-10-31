@@ -112,11 +112,21 @@ impl FullyNodedExport {
     ///
     /// If the database is empty or `include_blockheight` is false, the `blockheight` field
     /// returned will be `0`.
+    ///
+    /// The export format has no slot for a [`SingleUse`](KeychainKind::SingleUse) keychain, so
+    /// wallets with one return an error rather than a lossy export.
     pub fn export_wallet(
         wallet: &Wallet,
         label: &str,
         include_blockheight: bool,
     ) -> Result<Self, &'static str> {
+        if wallet
+            .keychains()
+            .any(|(k, _)| k == KeychainKind::SingleUse)
+        {
+            return Err("Single-use keychain cannot be exported");
+        }
+
         let descriptor = wallet
             .public_descriptor(KeychainKind::External)
             .to_string_with_secret(

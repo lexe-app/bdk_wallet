@@ -126,6 +126,7 @@ pub(crate) struct TxParams {
     pub(crate) fee_policy: Option<FeePolicy>,
     pub(crate) internal_policy_path: Option<BTreeMap<String, Vec<usize>>>,
     pub(crate) external_policy_path: Option<BTreeMap<String, Vec<usize>>>,
+    pub(crate) single_use_policy_path: Option<BTreeMap<String, Vec<usize>>>,
     pub(crate) utxos: HashMap<OutPoint, WeightedUtxo>,
     pub(crate) unspendable: HashSet<OutPoint>,
     pub(crate) manually_selected_only: bool,
@@ -263,6 +264,7 @@ impl<'a, Cs> TxBuilder<'a, Cs> {
         let to_update = match keychain {
             KeychainKind::Internal => &mut self.params.internal_policy_path,
             KeychainKind::External => &mut self.params.external_policy_path,
+            KeychainKind::SingleUse => &mut self.params.single_use_policy_path,
         };
 
         *to_update = Some(policy_path);
@@ -845,7 +847,7 @@ impl ChangeSpendPolicy {
         match self {
             ChangeSpendPolicy::ChangeAllowed => true,
             ChangeSpendPolicy::OnlyChange => utxo.keychain == KeychainKind::Internal,
-            ChangeSpendPolicy::ChangeForbidden => utxo.keychain == KeychainKind::External,
+            ChangeSpendPolicy::ChangeForbidden => utxo.keychain != KeychainKind::Internal,
         }
     }
 }
